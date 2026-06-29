@@ -77,7 +77,7 @@ import os
 import glob
 import shutil
 import getopt
-import socket
+import ipaddress
 import time
 import subprocess
 from subprocess import PIPE, STDOUT
@@ -116,10 +116,11 @@ def error_msg(msg, interactive):
 
 
 def valid_ip(address):
+    # IPv4Address rejects partial/short forms (e.g. "8", "8.8") that the
+    # older socket.inet_aton() accepted and then wrote into resolv.conf.
     try:
-        socket.inet_aton(address)
-        return address
-    except OSError:
+        return str(ipaddress.IPv4Address(address))
+    except ValueError:
         return False
 
 
