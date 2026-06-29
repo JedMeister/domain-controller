@@ -655,8 +655,8 @@ def main():
                     lines_to_print.append('')
                     lines_to_print.append(
                             f"See {COMMAND_LOG} for full output")
-                    error_msg = '\n'.join(lines_to_print)
-                    retry = d.error(f"{error_msg}\n\n")
+                    err_text = '\n'.join(lines_to_print)
+                    retry = d.error(f"{err_text}\n\n")
                     finalize = False
                     DEFAULT_REALM = realm
                     realm = ""
