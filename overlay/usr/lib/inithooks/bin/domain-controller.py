@@ -81,7 +81,6 @@ import ipaddress
 import time
 import subprocess
 from subprocess import PIPE, STDOUT
-from string import digits, ascii_uppercase, ascii_lowercase, punctuation
 
 from libinithooks.dialog_wrapper import Dialog
 
