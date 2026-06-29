@@ -666,7 +666,7 @@ def main():
                     break
                 else:
                     fatal("Errors in processing domain-controller inithook"
-                          " data:\n{samba_run_out}")
+                          f" data:\n{samba_run_out}")
             else:
                 finalize = True
 
