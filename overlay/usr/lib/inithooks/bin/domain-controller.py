@@ -641,7 +641,7 @@ def main():
             krb_pass = admin_password
             samba_domain = ['samba-tool', 'domain', 'join',
                             realm.lower(), 'DC',
-                            "--option='idmap_ldb:use rfc2307 = yes'"]
+                            '--option=idmap_ldb:use rfc2307 = yes']
             commands = [config_krb, samba_domain, export_krb]
             nameserver = join_nameserver
 
