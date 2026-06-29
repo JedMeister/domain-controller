@@ -77,6 +77,7 @@ import os
 import glob
 import shutil
 import getopt
+import socket
 import ipaddress
 import time
 import subprocess
@@ -199,11 +200,22 @@ def validate_username(username, interactive):
     return (username)
 
 
-def ping_client(fqdn):
-    proc = subprocess.run(['ping', '-c1', fqdn])
-    if proc.returncode == 0:
+def dns_reachable(nameserver, timeout=3):
+    """Check that a DNS server is reachable. Loopback is always treated as
+    reachable because during new-domain provisioning resolv.conf is pointed at
+    the not-yet-started local samba DNS. For a remote server, try a TCP
+    connection to port 53 - more reliable than ICMP, which is commonly
+    firewalled even when DNS itself answers."""
+    ns = valid_ip(nameserver)
+    if not ns:
+        return False
+    if ipaddress.IPv4Address(ns).is_loopback:
         return True
-    return False
+    try:
+        with socket.create_connection((ns, 53), timeout=timeout):
+            return True
+    except OSError:
+        return False
 
 
 def check_dns(fqdn):
@@ -271,9 +283,9 @@ def run_command(command, stdin=False):
 
 
 def update_resolvconf(domain, nameserver, interactive):
-    if not ping_client(nameserver):
+    if not dns_reachable(nameserver):
         return error_msg(
-            f"No client is responding to ping at ip address {nameserver}.",
+            f"No DNS server is reachable (TCP/53) at IP address {nameserver}.",
             interactive)
     shutil.copy2(RESOLVCNF_HEAD, RESOLVCNF_BAK)
     with open(RESOLVCNF_HEAD, 'r') as fob:
