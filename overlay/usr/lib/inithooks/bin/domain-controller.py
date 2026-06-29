@@ -129,10 +129,12 @@ def validate_realm(realm, interactive):
     if len(realm) > 255:
         err = error_msg("Realm must be less than 255 characters.", interactive)
     for bit in realm.split('.'):
-        if len(bit) < 0 or len(bit) > 63:
+        if len(bit) < 1 or len(bit) > 63:
             err = error_msg("All realm segments must be greater than 0 and"
                             " less than 63 characters.",
                             interactive)
+            # empty segment has no first char to validate below
+            continue
         regex = r'^[a-zA-Z0-9-]*$'
         if not bit[0].isalpha() or not re.fullmatch(regex, bit):
             err = error_msg("All realm segment characters must be"
