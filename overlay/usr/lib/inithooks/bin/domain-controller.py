@@ -329,8 +329,12 @@ def main():
 
     HOSTNAME = subprocess.run(['hostname', '-s'],
                               encoding='utf-8', stdout=PIPE).stdout.strip()
-    NET_IP = subprocess.run(['hostname', '-I'],
-                            encoding='utf-8', stdout=PIPE).stdout.strip()
+    # 'hostname -I' returns every address on the host (IPv6 included), space
+    # separated. Pick the first IPv4 - feeding the whole list into the samba
+    # 'interfaces' option or the hosts file produces malformed config.
+    net_ips = subprocess.run(['hostname', '-I'],
+                             encoding='utf-8', stdout=PIPE).stdout.split()
+    NET_IP = next((ip for ip in net_ips if valid_ip(ip)), "")
 
     # disabled for now, will reimplment at some point...
     # NET_IP321 = NET_IP.split('.')[:-1]
