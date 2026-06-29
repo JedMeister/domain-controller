@@ -397,7 +397,12 @@ def main():
             or TURNKEY_INIT):
         interactive = True
         if join_nameserver:
-            create = True
+            # --join_ns means the user wants to JOIN an existing domain, not
+            # create a new one. Drop an invalid value so the interactive flow
+            # re-prompts for it rather than silently skipping the prompt.
+            create = False
+            if not valid_ip(join_nameserver):
+                join_nameserver = ""
     elif realm and domain and admin_password and join_nameserver and hostname:
         join_nameserver = valid_ip(join_nameserver)
         update_resolvconf(realm.lower(), join_nameserver, interactive)
