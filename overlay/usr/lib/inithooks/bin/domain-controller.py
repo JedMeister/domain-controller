@@ -336,7 +336,6 @@ def main():
                              encoding='utf-8', stdout=PIPE).stdout.split()
     NET_IP = next((ip for ip in net_ips if valid_ip(ip)), "")
 
-    DEFAULT_HOSTNAME = "dc1"
     DEFAULT_REALM = "DOMAIN.LAN"
     DEFAULT_DOMAIN = "DOMAIN"
     DEFAULT_NS = ""
