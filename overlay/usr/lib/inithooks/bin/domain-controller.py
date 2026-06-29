@@ -123,6 +123,24 @@ def valid_ip(address):
         return False
 
 
+def get_dns_forwarder(default='8.8.8.8'):
+    """Return the host's current upstream (non-loopback) IPv4 nameserver to
+    use as the samba DNS forwarder, falling back to a public resolver if none
+    can be determined. Must be read before resolv.conf is rewritten to point
+    at the local samba DNS, otherwise we'd just find 127.0.0.1."""
+    try:
+        with open('/etc/resolv.conf') as fob:
+            for line in fob:
+                fields = line.split()
+                if len(fields) >= 2 and fields[0] == 'nameserver':
+                    ns = valid_ip(fields[1])
+                    if ns and not ipaddress.IPv4Address(ns).is_loopback:
+                        return ns
+    except FileNotFoundError:
+        pass
+    return default
+
+
 def validate_realm(realm, interactive):
     err = []
     realm = realm.strip('.')
@@ -335,6 +353,10 @@ def main():
     net_ips = subprocess.run(['hostname', '-I'],
                              encoding='utf-8', stdout=PIPE).stdout.split()
     NET_IP = next((ip for ip in net_ips if valid_ip(ip)), "")
+
+    # Capture the upstream resolver now, before update_resolvconf() repoints
+    # resolv.conf at the local samba DNS.
+    DNS_FORWARDER = get_dns_forwarder()
 
     DEFAULT_REALM = "DOMAIN.LAN"
     DEFAULT_DOMAIN = "DOMAIN"
@@ -591,7 +613,7 @@ def main():
                             f'--realm={realm}',
                             f'--domain={domain}',
                             f'--adminpass={admin_password}',
-                            '--option=dns forwarder=8.8.8.8',
+                            f'--option=dns forwarder={DNS_FORWARDER}',
                             f'--option=interfaces=127.0.0.1 {NET_IP}']
             commands = [samba_domain, set_expiry, export_krb]
             nameserver = '127.0.0.1'
