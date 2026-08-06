@@ -2,10 +2,10 @@
 #include <turnkey/samba>
 
 cups
-cups-pdf
+printer-driver-cups-pdf
 
 acl
-attr  /* Samba AD dependency */
+attr                    /* Samba AD dependency */
 krb5-user
 samba-vfs-modules
 samba-ad-provision
