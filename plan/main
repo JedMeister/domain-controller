@@ -23,10 +23,9 @@ printer-driver-cups-pdf
 acl
 attr                    /* Samba AD dependency */
 krb5-user
-samba-vfs-modules
-samba-ad-provision
-
+samba-ad-dc
 samba-dsdb-modules
+samba-ad-provision
 ldb-tools
 
 lighttpd
