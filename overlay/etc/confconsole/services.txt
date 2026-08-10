@@ -4,3 +4,6 @@ CUPS admin:   https://$ipaddr:631
 Webmin:       https://$ipaddr:12321
 SMB/CIFS:     \\$ipaddr (ports 139/445)
 SSH/SFTP:     root@$ipaddr (port 22)
+
+DNS to use when adding client
+              $ipaddr
