@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 # Copyright (c) 2010 Alon Swartz <alon@turnkeylinux.org> - all rights reserved
-# Copyright (c) 2011-2023 TurnKey GNU/Linux <admin@turnkeylinux.org>
+# Copyright (c) 2011-2026 TurnKey GNU/Linux <admin@turnkeylinux.org>
 """Configure Samba AD domain, realm and administrator password
 
 Options:
@@ -726,11 +726,11 @@ def main():
 
             if create:
                 msg = (f"{msg}\nWhen adding clients, you'll need this info:\n"
-                       f"    nameserver: {nameserver}\n"
+                       f"    nameserver: <IP_ADDRESS_OF_THIS_DC>\n"
                        "    * - set client to use this nameserver first!\n"
                        f"    AD DNS domain: {realm.lower()}\n"
                        f"    AD admin account name: {username}\n"
-                       "    AD admin user password: (what you set)\n")
+                       "    AD admin user password: <PASSWORD_SET>\n")
 
             if interactive:
                 d = Dialog('Turnkey Linux - First boot configuration')
