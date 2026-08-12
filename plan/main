@@ -2,15 +2,30 @@
 #include <turnkey/samba>
 
 cups
-cups-pdf
+printer-driver-cups-pdf
+
+// IMPORTANT: 'printer-driver-cups-pdf' install with cups running on host.
+// If cups is running on the host (or available via shared network) at build
+// time - i.e. listening on 127.0.0.1:631 - an interactive prompt will show:
+//      Running in chroot, ignoring request.
+//      Reloading Common Unix Printing System: cupsd failed!
+//      Password for root on localhost?
+//
+// This is a known "won't fix" issue. The only known workaround is to stop cups
+// on the host _before_ building:
+//      systemctl stop cups.service cups.socket cups.path
+//
+// Primary bug and other related bugs:
+//      https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=539156
+//      https://bugs.debian.org/cgi-bin/bugreport.cgi?bug=614713
+//      https://bugs.launchpad.net/ubuntu/+source/cups-pdf/+bug/1486796
 
 acl
-attr  /* Samba AD dependency */
+attr                    /* Samba AD dependency */
 krb5-user
-samba-vfs-modules
-samba-ad-provision
-
+samba-ad-dc
 samba-dsdb-modules
+samba-ad-provision
 ldb-tools
 
 lighttpd

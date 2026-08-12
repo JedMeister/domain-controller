@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 # Copyright (c) 2010 Alon Swartz <alon@turnkeylinux.org> - all rights reserved
-# Copyright (c) 2011-2023 TurnKey GNU/Linux <admin@turnkeylinux.org>
+# Copyright (c) 2011-2026 TurnKey GNU/Linux <admin@turnkeylinux.org>
 """Configure Samba AD domain, realm and administrator password
 
 Options:
@@ -78,10 +78,10 @@ import glob
 import shutil
 import getopt
 import socket
+import ipaddress
 import time
 import subprocess
 from subprocess import PIPE, STDOUT
-from string import digits, ascii_uppercase, ascii_lowercase, punctuation
 
 from libinithooks.dialog_wrapper import Dialog
 
@@ -116,11 +116,30 @@ def error_msg(msg, interactive):
 
 
 def valid_ip(address):
+    # IPv4Address rejects partial/short forms (e.g. "8", "8.8") that the
+    # older socket.inet_aton() accepted and then wrote into resolv.conf.
     try:
-        socket.inet_aton(address)
-        return address
-    except OSError:
+        return str(ipaddress.IPv4Address(address))
+    except ValueError:
         return False
+
+
+def get_dns_forwarder(default='8.8.8.8'):
+    """Return the host's current upstream (non-loopback) IPv4 nameserver to
+    use as the samba DNS forwarder, falling back to a public resolver if none
+    can be determined. Must be read before resolv.conf is rewritten to point
+    at the local samba DNS, otherwise we'd just find 127.0.0.1."""
+    try:
+        with open('/etc/resolv.conf') as fob:
+            for line in fob:
+                fields = line.split()
+                if len(fields) >= 2 and fields[0] == 'nameserver':
+                    ns = valid_ip(fields[1])
+                    if ns and not ipaddress.IPv4Address(ns).is_loopback:
+                        return ns
+    except FileNotFoundError:
+        pass
+    return default
 
 
 def validate_realm(realm, interactive):
@@ -129,10 +148,12 @@ def validate_realm(realm, interactive):
     if len(realm) > 255:
         err = error_msg("Realm must be less than 255 characters.", interactive)
     for bit in realm.split('.'):
-        if len(bit) < 0 or len(bit) > 63:
+        if len(bit) < 1 or len(bit) > 63:
             err = error_msg("All realm segments must be greater than 0 and"
                             " less than 63 characters.",
                             interactive)
+            # empty segment has no first char to validate below
+            continue
         regex = r'^[a-zA-Z0-9-]*$'
         if not bit[0].isalpha() or not re.fullmatch(regex, bit):
             err = error_msg("All realm segment characters must be"
@@ -179,11 +200,22 @@ def validate_username(username, interactive):
     return (username)
 
 
-def ping_client(fqdn):
-    proc = subprocess.run(['ping', '-c1', fqdn])
-    if proc.returncode == 0:
+def dns_reachable(nameserver, timeout=3):
+    """Check that a DNS server is reachable. Loopback is always treated as
+    reachable because during new-domain provisioning resolv.conf is pointed at
+    the not-yet-started local samba DNS. For a remote server, try a TCP
+    connection to port 53 - more reliable than ICMP, which is commonly
+    firewalled even when DNS itself answers."""
+    ns = valid_ip(nameserver)
+    if not ns:
+        return False
+    if ipaddress.IPv4Address(ns).is_loopback:
         return True
-    return False
+    try:
+        with socket.create_connection((ns, 53), timeout=timeout):
+            return True
+    except OSError:
+        return False
 
 
 def check_dns(fqdn):
@@ -251,9 +283,9 @@ def run_command(command, stdin=False):
 
 
 def update_resolvconf(domain, nameserver, interactive):
-    if not ping_client(nameserver):
+    if not dns_reachable(nameserver):
         return error_msg(
-            f"No client is responding to ping at ip address {nameserver}.",
+            f"No DNS server is reachable (TCP/53) at IP address {nameserver}.",
             interactive)
     shutil.copy2(RESOLVCNF_HEAD, RESOLVCNF_BAK)
     with open(RESOLVCNF_HEAD, 'r') as fob:
@@ -327,16 +359,17 @@ def main():
 
     HOSTNAME = subprocess.run(['hostname', '-s'],
                               encoding='utf-8', stdout=PIPE).stdout.strip()
-    NET_IP = subprocess.run(['hostname', '-I'],
-                            encoding='utf-8', stdout=PIPE).stdout.strip()
+    # 'hostname -I' returns every address on the host (IPv6 included), space
+    # separated. Pick the first IPv4 - feeding the whole list into the samba
+    # 'interfaces' option or the hosts file produces malformed config.
+    net_ips = subprocess.run(['hostname', '-I'],
+                             encoding='utf-8', stdout=PIPE).stdout.split()
+    NET_IP = next((ip for ip in net_ips if valid_ip(ip)), "")
 
-    # disabled for now, will reimplment at some point...
-    # NET_IP321 = NET_IP.split('.')[:-1]
-    # NET_IP321.reverse()
-    # NET_IP321 = '.'.join(NET_IP321)
-    # NET_IP4 = NET_IP.split('.')[-1]
+    # Capture the upstream resolver now, before update_resolvconf() repoints
+    # resolv.conf at the local samba DNS.
+    DNS_FORWARDER = get_dns_forwarder()
 
-    DEFAULT_HOSTNAME = "dc1"
     DEFAULT_REALM = "DOMAIN.LAN"
     DEFAULT_DOMAIN = "DOMAIN"
     DEFAULT_NS = ""
@@ -391,7 +424,12 @@ def main():
             or TURNKEY_INIT):
         interactive = True
         if join_nameserver:
-            create = True
+            # --join_ns means the user wants to JOIN an existing domain, not
+            # create a new one. Drop an invalid value so the interactive flow
+            # re-prompts for it rather than silently skipping the prompt.
+            create = False
+            if not valid_ip(join_nameserver):
+                join_nameserver = ""
     elif realm and domain and admin_password and join_nameserver and hostname:
         join_nameserver = valid_ip(join_nameserver)
         update_resolvconf(realm.lower(), join_nameserver, interactive)
@@ -587,7 +625,7 @@ def main():
                             f'--realm={realm}',
                             f'--domain={domain}',
                             f'--adminpass={admin_password}',
-                            '--option=dns forwarder=8.8.8.8',
+                            f'--option=dns forwarder={DNS_FORWARDER}',
                             f'--option=interfaces=127.0.0.1 {NET_IP}']
             commands = [samba_domain, set_expiry, export_krb]
             nameserver = '127.0.0.1'
@@ -603,7 +641,7 @@ def main():
             krb_pass = admin_password
             samba_domain = ['samba-tool', 'domain', 'join',
                             realm.lower(), 'DC',
-                            "--option='idmap_ldb:use rfc2307 = yes'"]
+                            '--option=idmap_ldb:use rfc2307 = yes']
             commands = [config_krb, samba_domain, export_krb]
             nameserver = join_nameserver
 
@@ -653,8 +691,8 @@ def main():
                     lines_to_print.append('')
                     lines_to_print.append(
                             f"See {COMMAND_LOG} for full output")
-                    error_msg = '\n'.join(lines_to_print)
-                    retry = d.error(f"{error_msg}\n\n")
+                    err_text = '\n'.join(lines_to_print)
+                    retry = d.error(f"{err_text}\n\n")
                     finalize = False
                     DEFAULT_REALM = realm
                     realm = ""
@@ -666,7 +704,7 @@ def main():
                     break
                 else:
                     fatal("Errors in processing domain-controller inithook"
-                          " data:\n{samba_run_out}")
+                          f" data:\n{samba_run_out}")
             else:
                 finalize = True
 
@@ -688,11 +726,11 @@ def main():
 
             if create:
                 msg = (f"{msg}\nWhen adding clients, you'll need this info:\n"
-                       f"    nameserver: {nameserver}\n"
+                       f"    nameserver: <IP_ADDRESS_OF_THIS_DC>\n"
                        "    * - set client to use this nameserver first!\n"
                        f"    AD DNS domain: {realm.lower()}\n"
                        f"    AD admin account name: {username}\n"
-                       "    AD admin user password: (what you set)\n")
+                       "    AD admin user password: <PASSWORD_SET>\n")
 
             if interactive:
                 d = Dialog('Turnkey Linux - First boot configuration')

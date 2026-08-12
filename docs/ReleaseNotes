@@ -1,14 +1,13 @@
-Notes for Domain Controller appliance v14.0
-===========================================
+Notes for Domain Controller appliance
+=====================================
 
-As of v14.0 TurnKey's domain-controller (DC) appliance 
-uses Samba4 to provide a Microsoft Active Directory 
-domain.
+TurnKey's domain-controller (DC) appliance uses Samba4
+to provide a Microsoft Active Directory domain.
 
-However, the current v14.0 appliance is a bare-bones 
-AD server. It is provided as a "better starting point" 
-for those that wish to use Samba4 as an AD DC but is 
-far from being feature complete.
+The appliance is a bare-bones AD server. It is provided
+as a "better starting point" for those that wish to use
+Samba4 as an AD DC but is far from being feature
+complete.
 
 Steps that need to be taken when first launched:
 ------------------------------------------------
@@ -34,9 +33,10 @@ samba-tool dns zonecreate dc1 1.168.192.in-addr.arpa --username=administrator --
 samba-tool dns add dom-controller 1.168.192.in-addr.arpa 192.168.1.50 PTR dc1.domain.lan --username=administrator --password="$ADMIN_PASS"
 
 - (optional) Adjust DNS forwarder in /etc/samba/smb.conf
-    -currently hardcoded to Google DNS (8.8.8.8)
-    -edit /etc/samba/smb.conf and adjust the field that 
-     is currently "dns forwarder = 8.8.8.8"
+    -defaults to the host's upstream resolver detected at
+     provision time (falls back to 8.8.8.8 if none found)
+    -edit /etc/samba/smb.conf and adjust the
+     "dns forwarder = ..." field to suit
 
 For how to join a Windows Desktop to a AD domain see the Samba Wiki: 
 https://wiki.samba.org/index.php/Joining_a_Windows_client_to_a_domain
